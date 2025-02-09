@@ -26,14 +26,16 @@ class FlutterContactPickerPlus {
 
 /// Represents a contact selected by the user.
 class Contact {
-  Contact({this.fullName, this.phoneNumbers});
+  Contact({this.fullName, this.phoneNumbers, this.vcf});
 
   factory Contact.fromMap(Map<dynamic, dynamic> map) => Contact(
       fullName: map['fullName'],
+      vcf: map['vcf'],
       phoneNumbers: List<String>.from(map['phoneNumbers'] ?? []));
 
   /// The full name of the contact, e.g., "Jayesh Pansheriya".
   final String? fullName;
+  final String? vcf;
 
   /// The phone numbers of the contact.
   final List<String>? phoneNumbers;

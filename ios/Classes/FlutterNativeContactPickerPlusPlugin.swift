@@ -29,6 +29,24 @@ class SinglePickerHandler: PickerHandler {
         let numbers: Array<String> = contact.phoneNumbers.compactMap { $0.value.stringValue as String }
         data["phoneNumbers"] = numbers
 
+        do {
+            let vCardData = try CNContactVCardSerialization.data(with: [contact])
+            if var vcfString = String(data: vCardData, encoding: .utf8) {
+                let lines = vcfString.components(separatedBy: .newlines)
+                let filteredLines = lines.filter { line in
+                    let upper = line.uppercased()
+                    return !(upper.hasPrefix("PHOTO") ||
+                             upper.hasPrefix("LOGO") ||
+                             upper.hasPrefix("SOUND"))
+                }
+                vcfString = filteredLines.joined(separator: "\n")
+                data["vcf"] = vcfString
+            }
+        } catch {
+            print("Error creating vCard: \(error)")
+            // Handle error as needed
+        }
+
         result(data)
     }
 }
@@ -45,6 +63,24 @@ class MultiPickerHandler: PickerHandler {
              let numbers: [String] = contact.phoneNumbers.compactMap { $0.value.stringValue as String }
              contactInfo["phoneNumbers"] = numbers
 
+            do {
+                let vCardData = try CNContactVCardSerialization.data(with: [contact])
+                if var vcfString = String(data: vCardData, encoding: .utf8) {
+                    let lines = vcfString.components(separatedBy: .newlines)
+                    let filteredLines = lines.filter { line in
+                        let upper = line.uppercased()
+                        return !(upper.hasPrefix("PHOTO") ||
+                                 upper.hasPrefix("LOGO") ||
+                                 upper.hasPrefix("SOUND"))
+                    }
+                    vcfString = filteredLines.joined(separator: "\n")
+                    contactInfo["vcf"] = vcfString
+                }
+            } catch {
+                print("Error creating vCard: \(error)")
+                // Handle error as needed
+            }
+ 
              selectedContacts.append(contactInfo)
          }
 

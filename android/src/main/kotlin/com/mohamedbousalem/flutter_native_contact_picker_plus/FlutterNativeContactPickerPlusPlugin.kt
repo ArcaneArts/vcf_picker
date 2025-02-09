@@ -76,7 +76,7 @@ class FlutterNativeContactPickerPlusPlugin : FlutterPlugin, MethodCallHandler, A
       pendingResult = null
       return true
     }
-
+ 
     data?.data?.let { contactUri ->
       val cursor = activity!!.contentResolver.query(contactUri, null, null, null, null)
       cursor?.use {
