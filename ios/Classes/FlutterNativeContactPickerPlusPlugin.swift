@@ -21,33 +21,61 @@ class PickerHandler: NSObject, CNContactPickerDelegate  {
 
 class SinglePickerHandler: PickerHandler {
     @available(iOS 9.0, *)
-    public func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
+    public func contactPicker(_ picker: CNContactPickerViewController, didSelect partialContact: CNContact) {
 
-        var data = Dictionary<String, Any>()
-        data["fullName"] = CNContactFormatter.string(from: contact, style: CNContactFormatterStyle.fullName)
-
-        let numbers: Array<String> = contact.phoneNumbers.compactMap { $0.value.stringValue as String }
-        data["phoneNumbers"] = numbers
-
-        do {
-            let vCardData = try CNContactVCardSerialization.data(with: [contact])
-            if var vcfString = String(data: vCardData, encoding: .utf8) {
-                let lines = vcfString.components(separatedBy: .newlines)
-                let filteredLines = lines.filter { line in
-                    let upper = line.uppercased()
-                    return !(upper.hasPrefix("PHOTO") ||
-                             upper.hasPrefix("LOGO") ||
-                             upper.hasPrefix("SOUND"))
-                }
-                vcfString = filteredLines.joined(separator: "\n")
-                data["vcf"] = vcfString
+        // We got a partial contact; let's refetch it fully from the store:
+        let store = CNContactStore()
+        store.requestAccess(for: .contacts) { granted, error in
+            if let error = error {
+                print("Error requesting access: \(error)")
+                return
             }
-        } catch {
-            print("Error creating vCard: \(error)")
-            // Handle error as needed
+            if granted {
+                // Now safe to fetch
+            } else {
+                print("Access denied by user.")
+            }
         }
+        do {
+            // We want all keys required by VCard serialization
+            let keys = [CNContactVCardSerialization.descriptorForRequiredKeys()] as [Any]
+            
+            // Fetch the fully populated contact using the identifier
+            let fullContact = try store.unifiedContact(
+                withIdentifier: partialContact.identifier,
+                keysToFetch: keys as! [CNKeyDescriptor]
+            )
+            
+            // Now we can safely get the name/phone from this full contact
+            var data = [String: Any]()
+            data["fullName"] = CNContactFormatter.string(from: fullContact, style: .fullName)
 
-        result(data)
+            let numbers: [String] = fullContact.phoneNumbers.compactMap {
+                $0.value.stringValue
+            }
+            data["phoneNumbers"] = numbers
+
+            // Attempt vCard serialization again, but this time on the fully fetched contact
+            let vCardData = try CNContactVCardSerialization.data(with: [fullContact])
+            if let vcfString = String(data: vCardData, encoding: .utf8) {
+                data["vcf"] = vcfString
+                print("VCF is: \(vcfString)")
+            }
+
+            // Send result back to Flutter
+            result(data)
+
+        } catch {
+            print("Error creating vCard or fetching full contact: \(error)")
+            // Return at least the partial info we already have if you like
+            var data = [String: Any]()
+            data["fullName"] = CNContactFormatter.string(from: partialContact, style: .fullName)
+            data["phoneNumbers"] = partialContact.phoneNumbers.compactMap {
+                $0.value.stringValue
+            }
+            data["vcf"] = nil  // or omit
+            result(data)
+        }
     }
 }
 
@@ -66,15 +94,8 @@ class MultiPickerHandler: PickerHandler {
             do {
                 let vCardData = try CNContactVCardSerialization.data(with: [contact])
                 if var vcfString = String(data: vCardData, encoding: .utf8) {
-                    let lines = vcfString.components(separatedBy: .newlines)
-                    let filteredLines = lines.filter { line in
-                        let upper = line.uppercased()
-                        return !(upper.hasPrefix("PHOTO") ||
-                                 upper.hasPrefix("LOGO") ||
-                                 upper.hasPrefix("SOUND"))
-                    }
-                    vcfString = filteredLines.joined(separator: "\n")
                     contactInfo["vcf"] = vcfString
+                   
                 }
             } catch {
                 print("Error creating vCard: \(error)")
